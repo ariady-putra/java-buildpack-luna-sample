@@ -10,7 +10,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>1.5.3.RELEASE</version>
+        <version>2.7.11</version>
     </parent>
 
     <groupId>io.pivotal</groupId>
@@ -19,10 +19,16 @@
     <packaging>jar</packaging>
 
     <properties>
-        <luna-provider.version>5.4.1-2</luna-provider.version>
+        <luna-provider.version>10.3.0-275</luna-provider.version>
         <java.version>1.8</java.version>
     </properties>
-
+    <!-- mvn install:install-file \
+            -Dfile=LunaProvider.jar \
+            -DgroupId=com.safenet-inc \
+            -DartifactId=luna-provider \
+            -Dversion=10.3.0-275 \
+            -Dpackaging=jar
+    -->
     <dependencies>
         <dependency>
             <groupId>com.safenet-inc</groupId>
@@ -30,10 +36,18 @@
             <version>${luna-provider.version}</version>
             <scope>provided</scope>
         </dependency>
+        
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk15on</artifactId>
+            <version>1.68</version>
+        </dependency>
+        
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -49,11 +63,11 @@
         </plugins>
     </build>
 
-    <repositories>
+    <!-- repositories>
         <repository>
             <id>secret-repository</id>
             <url>http://do-not-give-this-url-to-anyone.download.pivotal.io.s3.amazonaws.com/maven</url>
         </repository>
-    </repositories>
+    </repositories -->
 
 </project>

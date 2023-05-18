@@ -1,21 +1,21 @@
 package io.pivotal.luna;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
-
 import java.security.Provider;
 import java.security.Security;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 @RestController
 final class SecurityProvidersController {
 
-    @RequestMapping(method = RequestMethod.GET, value = "/security-providers")
+    @GetMapping("/security-providers")
     List<ProviderProjection> securityProviders() {
-        return Arrays.stream(Security.getProviders())
+        return Arrays
+                .stream(Security.getProviders())
                 .map(ProviderProjection::new)
                 .collect(Collectors.toList());
     }

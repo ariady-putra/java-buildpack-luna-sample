@@ -3,7 +3,7 @@ A REST-ful sample application that exercises the Luna HSM.
 To do this, it exposes four cryptography REST endpoints that expect to recieve a JSON payload. Each endpoint returns values that can be used as arguments to the other endpoints.
 
 * `POST /encrypt` - `message`, a message to encrypt.
-* `POST /decrypt` - `cipher-text`, a base64 encoded encrypted message to decrypt.
+* `POST /decrypt` - `cipher-text`, the encrypted message to decrypt.
 * `POST /sign` - `message`, a message to sign.
 * `POST /verify` - `message` and `signature`, a signature to verify against a message.
 

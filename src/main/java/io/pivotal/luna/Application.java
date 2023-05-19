@@ -5,8 +5,10 @@ import com.safenetinc.luna.LunaSlotManager;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
@@ -37,11 +39,14 @@ public class Application {
     @Value("${lunahsm.transformation}")
     private String transformation = "RSA/NONE/NoPadding";
 
-    // @Value("${lunahsm.key_size}")
-    // private int keySize = 1024;
+    @Value("${lunahsm.key_size}")
+    private int keySize = 1024;
 
     @Value("${lunahsm.private_key}")
-    private String key;
+    private String privateKey;
+
+    @Value("${lunahsm.public_key}")
+    private String publicKey;
 
     @Value("${lunahsm.password}")
     private String password;
@@ -82,7 +87,10 @@ public class Application {
 
         // return keyPairGenerator.generateKeyPair();
 
-        byte[] b64 = Base64.getDecoder().decode(key
+        KeyFactory rsa = KeyFactory.getInstance("RSA", provider);
+
+        // Private Key
+        byte[] b64private = Base64.getDecoder().decode(privateKey
                 .replace("\n", "")
                 .replace("-----BEGIN RSA PRIVATE KEY-----", "")
                 .replace("-----END RSA PRIVATE KEY-----", "")
@@ -93,16 +101,21 @@ public class Application {
         v2.add(new ASN1ObjectIdentifier(PKCSObjectIdentifiers.rsaEncryption.getId()));
         v2.add(DERNull.INSTANCE);
         v1.add(new DERSequence(v2));
-        v1.add(new DEROctetString(b64));
-
+        v1.add(new DEROctetString(b64private));
         ASN1Sequence seq = new DERSequence(v1);
         byte[] der = seq.getEncoded("DER");
-
         PKCS8EncodedKeySpec pkcs8 = new PKCS8EncodedKeySpec(der);
-        KeyFactory rsa = KeyFactory.getInstance("RSA", provider);
+
+        // Public Key
+        byte[] b64public = Base64.getDecoder().decode(publicKey
+                .replace("\n", "")
+                .replace("-----BEGIN RSA PUBLIC KEY-----", "")
+                .replace("-----END RSA PUBLIC KEY-----", "")
+                .trim());
+        X509EncodedKeySpec x509 = new X509EncodedKeySpec(b64public);
 
         return new KeyPair(
-                rsa.generatePublic(pkcs8),
+                rsa.generatePublic(x509),
                 rsa.generatePrivate(pkcs8));
 
     }

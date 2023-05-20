@@ -1,6 +1,8 @@
 package io.pivotal.luna;
 
+import com.safenetinc.luna.LunaAPI;
 import com.safenetinc.luna.LunaSlotManager;
+import com.safenetinc.luna.provider.LunaProvider;
 
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
@@ -9,6 +11,7 @@ import java.security.KeyPairGenerator;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
@@ -48,7 +51,10 @@ public class Application {
     @Value("${lunahsm.public_key}")
     private String publicKey;
 
-    @Value("${lunahsm.password}")
+    @Value("${lunahsm.login.token_label}")
+    private String tokenLabel;
+
+    @Value("${lunahsm.login.password}")
     private String password;
 
     public static void main(String[] args) {
@@ -79,6 +85,53 @@ public class Application {
     @DependsOn("slotManager")
     KeyPair keyPair() throws Exception {
 
+        LunaProvider luna = LunaProvider.getInstance();
+        System.out.println("\nLuna Provider:\n");
+        System.out.println("Info: " + luna.getInfo());
+        System.out.println("Name: " + luna.getName());
+        System.out.println("Version: " + luna.getVersion());
+
+        LunaAPI api = slotManager().getLunaAPI();
+        System.out.println("\nLuna API:\n");
+        for (int slot : api.GetSlotList()) {
+            // System.out.println("Slot: " + slot);
+
+            String label = api.GetTokenLabel(slot);
+            // System.out.println("if(" + label + ".equalsIgnoreCase(" + tokenLabel + "))");
+            if (label.trim().equalsIgnoreCase(tokenLabel)) {
+                int session = api.OpenSession(slot);
+                // System.out.println("Session handle: " + session);
+
+                System.out.println("Label: " + label);
+                System.out.println("Serial Number: " + api.GetTokenSerialNumber(slot));
+
+                StringBuilder version = new StringBuilder();
+                Arrays.stream(api.GetTokenFirmwareVersion(slot))
+                        .forEachOrdered(v -> version.append(v + "."));
+                version.deleteCharAt(version.length() - 1);
+                System.out.println("Firmware Version: " + version);
+
+                System.out.println("Key list:\n");
+                for (int key : api.GetKeyList(session)) {
+                    System.out.println("\tKey: " + key);
+                    System.out.println("\tAlias: " + api.GetKeyAlias(session, key));
+
+                    System.out.println("\tAttributes:\n");
+                    for (long attribute : api.GetInitialAttributes(session, key)) {
+                        System.out.println("\t\tAttribute: " + attribute);
+                        System.out.println("\t\t" + api.GetLargeAttribute(session, key, attribute));
+                        System.out.println();
+                    }
+
+                    System.out.println();
+                }
+
+                api.CloseSession(slot);
+                // System.out.println();
+                break;
+            }
+        }
+
         // KeyPairGenerator keyPairGenerator = KeyPairGenerator
         // .getInstance(
         // algorithm,
@@ -92,6 +145,8 @@ public class Application {
         // Private Key
         byte[] b64private = Base64.getDecoder().decode(privateKey
                 .replace("\n", "")
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
                 .replace("-----BEGIN RSA PRIVATE KEY-----", "")
                 .replace("-----END RSA PRIVATE KEY-----", "")
                 .trim());
@@ -109,6 +164,8 @@ public class Application {
         // Public Key
         byte[] b64public = Base64.getDecoder().decode(publicKey
                 .replace("\n", "")
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
                 .replace("-----BEGIN RSA PUBLIC KEY-----", "")
                 .replace("-----END RSA PUBLIC KEY-----", "")
                 .trim());
@@ -134,7 +191,7 @@ public class Application {
     LunaSlotManager slotManager() {
 
         LunaSlotManager slotManager = LunaSlotManager.getInstance();
-        slotManager.login(password);
+        slotManager.login(tokenLabel, password);
 
         return slotManager;
 

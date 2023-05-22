@@ -33,7 +33,7 @@ final class KeyPairController {
                         privateKey,
                         publicKey
                 });
-                
+
     }
 
 }

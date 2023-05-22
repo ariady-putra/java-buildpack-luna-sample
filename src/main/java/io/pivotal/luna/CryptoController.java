@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.safenetinc.luna.LunaUtils;
+
 import static io.pivotal.luna.Util.*;
 
 @RestController
@@ -53,7 +55,7 @@ final class CryptoController {
                 .orElseThrow(() -> new IllegalArgumentException("Payload must contain 'cipher-text'"));
         this.logger.info("Decrypting Cipher Text '{}'", cipherText);
 
-        this.decryptionCipher.update(hexToBytes(cipherText));
+        this.decryptionCipher.update(LunaUtils.hexStringToByteArray(cipherText));
         String message = new String(this.decryptionCipher.doFinal(), Charset.defaultCharset()).trim();
 
         return zip(
@@ -77,7 +79,7 @@ final class CryptoController {
         this.logger.info("Encrypting Message '{}'", message);
 
         this.encryptionCipher.update(message.getBytes(Charset.defaultCharset()));
-        String cipherText = bytesToHex(this.encryptionCipher.doFinal());
+        String cipherText = LunaUtils.getHexString(this.encryptionCipher.doFinal(), false);
 
         return zip(
                 new String[] {
@@ -100,7 +102,7 @@ final class CryptoController {
         this.logger.info("Signing Message '{}'", message);
 
         this.signingSignature.update(message.getBytes(Charset.defaultCharset()));
-        String signature = bytesToHex(this.signingSignature.sign());
+        String signature = LunaUtils.getHexString(this.signingSignature.sign(), false);
 
         return zip(
                 new String[] {
@@ -126,7 +128,7 @@ final class CryptoController {
         this.logger.info("Verifying Message '{}' and Signature '{}'", message, signature);
 
         this.verificationSignature.update(message.getBytes(Charset.defaultCharset()));
-        boolean verified = this.verificationSignature.verify(hexToBytes(signature));
+        boolean verified = this.verificationSignature.verify(LunaUtils.hexStringToByteArray(signature));
 
         return zip(
                 new String[] {

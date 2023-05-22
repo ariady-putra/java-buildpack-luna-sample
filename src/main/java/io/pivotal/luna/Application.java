@@ -1,29 +1,16 @@
 package io.pivotal.luna;
 
-import com.safenetinc.luna.LunaAPI;
 import com.safenetinc.luna.LunaSlotManager;
-import com.safenetinc.luna.provider.LunaProvider;
+import com.safenetinc.luna.LunaTokenObject;
+import com.safenetinc.luna.provider.key.LunaPrivateKeyRsa;
+import com.safenetinc.luna.provider.key.LunaPublicKeyRsa;
 
 import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.Signature;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Arrays;
-import java.util.Base64;
 
 import javax.crypto.Cipher;
 
-import org.bouncycastle.asn1.ASN1EncodableVector;
-import org.bouncycastle.asn1.ASN1Integer;
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.ASN1Sequence;
-import org.bouncycastle.asn1.DERNull;
-import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.DERSequence;
-import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -33,29 +20,26 @@ import org.springframework.context.annotation.DependsOn;
 @SpringBootApplication
 public class Application {
 
-    @Value("${lunahsm.provider}")
-    private String provider = "LunaProvider";
+    @Value("${luna_hsm.security_provider}")
+    private String securityProvider = "LunaProvider";
 
-    @Value("${lunahsm.algorithm}")
-    private String algorithm = "RSA";
+    @Value("${luna_hsm.signature_algorithm}")
+    private String signatureAlgorithm = "RSA";
 
-    @Value("${lunahsm.transformation}")
-    private String transformation = "RSA/NONE/NoPadding";
+    @Value("${lunahsm.cipher_transformation}")
+    private String cipherTransformation = "RSA/NONE/NoPadding";
 
-    @Value("${lunahsm.key_size}")
-    private int keySize = 1024;
-
-    @Value("${lunahsm.private_key}")
-    private String privateKey;
-
-    @Value("${lunahsm.public_key}")
-    private String publicKey;
-
-    @Value("${lunahsm.login.token_label}")
+    @Value("${luna_hsm.token_label}")
     private String tokenLabel;
 
-    @Value("${lunahsm.login.password}")
-    private String password;
+    @Value("${luna_hsm.login_password}")
+    private String loginPassword;
+
+    @Value("${luna_hsm.key_alias.private}")
+    private String privateKeyAlias;
+
+    @Value("${luna_hsm.key_alias.public}")
+    private String publicKeyAlias;
 
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
@@ -64,7 +48,7 @@ public class Application {
     @Bean
     Cipher decryptionCipher(KeyPair keyPair) throws GeneralSecurityException {
 
-        Cipher cipher = Cipher.getInstance(transformation, provider);
+        Cipher cipher = Cipher.getInstance(cipherTransformation, securityProvider);
         cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
 
         return cipher;
@@ -74,7 +58,7 @@ public class Application {
     @Bean
     Cipher encryptionCipher(KeyPair keyPair) throws GeneralSecurityException {
 
-        Cipher cipher = Cipher.getInstance(transformation, provider);
+        Cipher cipher = Cipher.getInstance(cipherTransformation, securityProvider);
         cipher.init(Cipher.ENCRYPT_MODE, keyPair.getPublic());
 
         return cipher;
@@ -85,102 +69,22 @@ public class Application {
     @DependsOn("slotManager")
     KeyPair keyPair() throws Exception {
 
-        LunaProvider luna = LunaProvider.getInstance();
-        System.out.println("\nLuna Provider:\n");
-        System.out.println("Info: " + luna.getInfo());
-        System.out.println("Name: " + luna.getName());
-        System.out.println("Version: " + luna.getVersion());
+        int slot = slotManager().findSlotFromLabel(tokenLabel);
 
-        LunaAPI api = slotManager().getLunaAPI();
-        System.out.println("\nLuna API:\n");
-        for (int slot : api.GetSlotList()) {
-            // System.out.println("Slot: " + slot);
+        LunaTokenObject privateKey = LunaTokenObject.LocateKeyByAlias(privateKeyAlias, slot);
+        LunaPrivateKeyRsa privateKeyRSA = new LunaPrivateKeyRsa(privateKey);
 
-            String label = api.GetTokenLabel(slot);
-            // System.out.println("if(" + label + ".equalsIgnoreCase(" + tokenLabel + "))");
-            if (label.trim().equalsIgnoreCase(tokenLabel)) {
-                int session = api.OpenSession(slot);
-                // System.out.println("Session handle: " + session);
+        LunaTokenObject publicKey = LunaTokenObject.LocateKeyByAlias(publicKeyAlias, slot);
+        LunaPublicKeyRsa publicKeyRSA = new LunaPublicKeyRsa(publicKey);
 
-                System.out.println("Label: " + label);
-                System.out.println("Serial Number: " + api.GetTokenSerialNumber(slot));
-
-                StringBuilder version = new StringBuilder();
-                Arrays.stream(api.GetTokenFirmwareVersion(slot))
-                        .forEachOrdered(v -> version.append(v + "."));
-                version.deleteCharAt(version.length() - 1);
-                System.out.println("Firmware Version: " + version);
-
-                System.out.println("Key list:\n");
-                for (int key : api.GetKeyList(session)) {
-                    System.out.println("\tKey: " + key);
-                    System.out.println("\tAlias: " + api.GetKeyAlias(session, key));
-
-                    System.out.println("\tAttributes:\n");
-                    for (long attribute : api.GetInitialAttributes(session, key)) {
-                        System.out.println("\t\tAttribute: " + attribute);
-                        System.out.println("\t\t" + api.GetLargeAttribute(session, key, attribute));
-                        System.out.println();
-                    }
-
-                    System.out.println();
-                }
-
-                api.CloseSession(slot);
-                // System.out.println();
-                break;
-            }
-        }
-
-        // KeyPairGenerator keyPairGenerator = KeyPairGenerator
-        // .getInstance(
-        // algorithm,
-        // provider);
-        // keyPairGenerator.initialize(keySize);
-
-        // return keyPairGenerator.generateKeyPair();
-
-        KeyFactory rsa = KeyFactory.getInstance("RSA", provider);
-
-        // Private Key
-        byte[] b64private = Base64.getDecoder().decode(privateKey
-                .replace("\n", "")
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replace("-----BEGIN RSA PRIVATE KEY-----", "")
-                .replace("-----END RSA PRIVATE KEY-----", "")
-                .trim());
-        ASN1EncodableVector v1 = new ASN1EncodableVector();
-        v1.add(new ASN1Integer(0));
-        ASN1EncodableVector v2 = new ASN1EncodableVector();
-        v2.add(new ASN1ObjectIdentifier(PKCSObjectIdentifiers.rsaEncryption.getId()));
-        v2.add(DERNull.INSTANCE);
-        v1.add(new DERSequence(v2));
-        v1.add(new DEROctetString(b64private));
-        ASN1Sequence seq = new DERSequence(v1);
-        byte[] der = seq.getEncoded("DER");
-        PKCS8EncodedKeySpec pkcs8 = new PKCS8EncodedKeySpec(der);
-
-        // Public Key
-        byte[] b64public = Base64.getDecoder().decode(publicKey
-                .replace("\n", "")
-                .replace("-----BEGIN PUBLIC KEY-----", "")
-                .replace("-----END PUBLIC KEY-----", "")
-                .replace("-----BEGIN RSA PUBLIC KEY-----", "")
-                .replace("-----END RSA PUBLIC KEY-----", "")
-                .trim());
-        X509EncodedKeySpec x509 = new X509EncodedKeySpec(b64public);
-
-        return new KeyPair(
-                rsa.generatePublic(x509),
-                rsa.generatePrivate(pkcs8));
+        return new KeyPair(publicKeyRSA, privateKeyRSA);
 
     }
 
     @Bean
     Signature signingSignature(KeyPair keyPair) throws GeneralSecurityException {
 
-        Signature signature = Signature.getInstance(algorithm);
+        Signature signature = Signature.getInstance(signatureAlgorithm);
         signature.initSign(keyPair.getPrivate());
 
         return signature;
@@ -191,7 +95,7 @@ public class Application {
     LunaSlotManager slotManager() {
 
         LunaSlotManager slotManager = LunaSlotManager.getInstance();
-        slotManager.login(tokenLabel, password);
+        slotManager.login(loginPassword);
 
         return slotManager;
 
@@ -200,7 +104,7 @@ public class Application {
     @Bean
     Signature verificationSignature(KeyPair keyPair) throws GeneralSecurityException {
 
-        Signature signature = Signature.getInstance(algorithm);
+        Signature signature = Signature.getInstance(signatureAlgorithm);
         signature.initVerify(keyPair.getPublic());
 
         return signature;
